@@ -10,13 +10,13 @@
       <TargetName>mm32f327x_g8p_project</TargetName>
       <ToolsetNumber>0x4</ToolsetNumber>
       <ToolsetName>ARM-ADS</ToolsetName>
-      <pCCUsed>6180000::V6.18::ARMCLANG</pCCUsed>
+      <pCCUsed>6230000::V6.23::ARMCLANG</pCCUsed>
       <uAC6>1</uAC6>
       <TargetOption>
         <TargetCommonOption>
           <Device>MM32F3273G8P</Device>
           <Vendor>MindMotion</Vendor>
-          <PackID>MindMotion.MM32F3270_DFP.1.0.6</PackID>
+          <PackID>MindMotion.MM32F3270_DFP.1.0.5</PackID>
           <PackURL>http://www.mindmotion.com.cn/Download/MDK_KEIL/</PackURL>
           <Cpu>IRAM(0x20000000,0x20000) IROM(0x08000000,0x80000) CPUTYPE("Cortex-M3") CLOCK(12000000) ELITTLE</Cpu>
           <FlashUtilSpec></FlashUtilSpec>
@@ -340,7 +340,7 @@
               <MiscControls></MiscControls>
               <Define></Define>
               <Undefine></Undefine>
-              <IncludePath>..\user\inc;..\code;..\..\libraries\zf_common;..\..\libraries\zf_device;..\..\libraries\zf_driver;..\..\libraries\sdk;..\..\libraries\sdk\CMSIS\Include;..\..\libraries\sdk\drivers;..\..\libraries\components\fatfs\source</IncludePath>
+              <IncludePath>..\user\inc;..\code;..\..\libraries\zf_common;..\..\libraries\zf_device;..\..\libraries\zf_driver;..\..\libraries\sdk;..\..\libraries\sdk\CMSIS\Include;..\..\libraries\sdk\drivers;..\..\libraries\components\fatfs\source;..\code\IMU;..\code\IMU\common;..\code\IMU\Complementary;..\code\IMU\EKF;..\code\IMU\Madgwick;..\code\IMU\Mahony;..\code\IMU\Quaternion;..\code\IMU\common</IncludePath>
             </VariousControls>
           </Cads>
           <Aads>
@@ -405,9 +405,6 @@
               <FilePath>..\user\inc\isr.h</FilePath>
             </File>
           </Files>
-        </Group>
-        <Group>
-          <GroupName>code</GroupName>
         </Group>
         <Group>
           <GroupName>doc</GroupName>
@@ -1221,6 +1218,126 @@
               <FileName>ffunicode.c</FileName>
               <FileType>1</FileType>
               <FilePath>..\..\libraries\components\fatfs\source\ffunicode.c</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>IMU_common</GroupName>
+          <Files>
+            <File>
+              <FileName>imu_common.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\common\imu_common.h</FilePath>
+            </File>
+            <File>
+              <FileName>imu_math.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\code\IMU\common\imu_math.c</FilePath>
+            </File>
+            <File>
+              <FileName>imu_math.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\common\imu_math.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>IMU</GroupName>
+          <Files>
+            <File>
+              <FileName>IMU.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\code\IMU\IMU.c</FilePath>
+            </File>
+            <File>
+              <FileName>IMU.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\IMU.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Quaternion</GroupName>
+          <Files>
+            <File>
+              <FileName>quaternion.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\code\IMU\Quaternion\quaternion.c</FilePath>
+            </File>
+            <File>
+              <FileName>quaternion.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\Quaternion\quaternion.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>EKF</GroupName>
+          <Files>
+            <File>
+              <FileName>ekf.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\code\IMU\EKF\ekf.c</FilePath>
+            </File>
+            <File>
+              <FileName>ekf.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\EKF\ekf.h</FilePath>
+            </File>
+            <File>
+              <FileName>ekf_matrix.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\code\IMU\EKF\ekf_matrix.c</FilePath>
+            </File>
+            <File>
+              <FileName>ekf_matrix.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\EKF\ekf_matrix.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Madgwick</GroupName>
+          <Files>
+            <File>
+              <FileName>madgwick.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\code\IMU\Madgwick\madgwick.c</FilePath>
+            </File>
+            <File>
+              <FileName>madgwick.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\Madgwick\madgwick.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Mahony</GroupName>
+          <Files>
+            <File>
+              <FileName>mahony.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\code\IMU\Mahony\mahony.c</FilePath>
+            </File>
+            <File>
+              <FileName>mahony.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\Mahony\mahony.h</FilePath>
+            </File>
+          </Files>
+        </Group>
+        <Group>
+          <GroupName>Complementary</GroupName>
+          <Files>
+            <File>
+              <FileName>complementary.c</FileName>
+              <FileType>1</FileType>
+              <FilePath>..\code\IMU\Complementary\complementary.c</FilePath>
+            </File>
+            <File>
+              <FileName>complementary.h</FileName>
+              <FileType>5</FileType>
+              <FilePath>..\code\IMU\Complementary\complementary.h</FilePath>
             </File>
           </Files>
         </Group>

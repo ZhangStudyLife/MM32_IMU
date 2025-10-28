@@ -1,100 +1,171 @@
 /*********************************************************************************************************************
-* MM32F327X-G8P Opensourec Library 即（MM32F327X-G8P 开源库）是一个基于官方 SDK 接口的第三方开源库
-* Copyright (c) 2022 SEEKFREE 逐飞科技
-* 
-* 本文件是 MM32F327X-G8P 开源库的一部分
-* 
-* MM32F327X-G8P 开源库 是免费软件
-* 您可以根据自由软件基金会发布的 GPL（GNU General Public License，即 GNU通用公共许可证）的条款
-* 即 GPL 的第3版（即 GPL3.0）或（您选择的）任何后来的版本，重新发布和/或修改它
-* 
-* 本开源库的发布是希望它能发挥作用，但并未对其作任何的保证
-* 甚至没有隐含的适销性或适合特定用途的保证
-* 更多细节请参见 GPL
-* 
-* 您应该在收到本开源库的同时收到一份 GPL 的副本
-* 如果没有，请参阅<https://www.gnu.org/licenses/>
-* 
-* 额外注明：
-* 本开源库使用 GPL3.0 开源许可证协议 以上许可申明为译文版本
-* 许可申明英文版在 libraries/doc 文件夹下的 GPL3_permission_statement.txt 文件中
-* 许可证副本在 libraries 文件夹下 即该文件夹下的 LICENSE 文件
-* 欢迎各位使用并传播本程序 但修改内容时必须保留逐飞科技的版权声明（即本声明）
-* 
-* 文件名称          main
-* 公司名称          成都逐飞科技有限公司
-* 版本信息          查看 libraries/doc 文件夹内 version 文件 版本说明
-* 开发环境          IAR 8.32.4 or MDK 5.37
-* 适用平台          MM32F327X_G8P
-* 店铺链接          https://seekfree.taobao.com/
-* 
-* 修改记录
-* 日期              作者                备注
-* 2022-08-10        Teternal            first version
+* MM32F327X-G8P IMU姿态解算测试程序 - 老王暴躁技术流
+*
+* 功能说明:
+*   1. 使用定时器中断(200Hz)周期性触发IMU数据更新
+*   2. 只使用Quaternion算法进行姿态解算
+*   3. 通过串口发送VOFA+ JustFloat协议数据：9个float依次为
+*      gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z, pitch, roll, yaw
+*
+* 作者: 老王暴躁技术流
+* 日期: 2025-10-28
 ********************************************************************************************************************/
 
 #include "zf_common_headfile.h"
+#include "../code/IMU/IMU.h"
+#include <string.h>
 
-// 打开新的工程或者工程移动了位置务必执行以下操作
-// 第一步 关闭上面所有打开的文件
-// 第二步 project->clean  等待下方进度条走完
+/********************************************************************************************************************
+ * 配置参数
+ ********************************************************************************************************************/
 
-// 本例程是开源库移植用空工程
+#define IMU_SAMPLE_RATE         500     // IMU采样率：500Hz
+#define VOFA_SEND_RATE          100      // 数据发送率：500Hz
 
-// **************************** 代码区域 ****************************
+/********************************************************************************************************************
+ * 全局变量
+ ********************************************************************************************************************/
+
+volatile uint8_t g_imu_update_flag = 0;  // IMU更新标志
+
+/********************************************************************************************************************
+ * VOFA+ JustFloat协议发送函数
+ ********************************************************************************************************************/
+
+/**
+ * @brief 发送VOFA+ JustFloat协议数据
+ * @param data float数组指针
+ * @param count 数据个数
+ */
+void vofa_send_data(float *data, uint8_t count)
+{
+    if (data == NULL || count == 0) return;
+
+    // 准备发送缓冲区（float数据 + 帧尾）
+    uint32_t data_bytes = count * sizeof(float);
+    uint8_t send_buffer[64];  // 最大支持15个float（15*4=60字节 + 4字节帧尾）
+
+    if (data_bytes + 4 > sizeof(send_buffer)) return;  // 防止缓冲区溢出
+
+    // 复制float数据（小端格式）
+    memcpy(send_buffer, data, data_bytes);
+
+    // 添加帧尾：0x00 0x00 0x80 0x7F
+    send_buffer[data_bytes + 0] = 0x00;
+    send_buffer[data_bytes + 1] = 0x00;
+    send_buffer[data_bytes + 2] = 0x80;
+    send_buffer[data_bytes + 3] = 0x7F;
+
+    // 一次性发送整个缓冲区（艹！快多了！）
+    uart_write_buffer(UART_1, send_buffer, data_bytes + 4);
+}
+
+/**
+ * @brief 发送IMU数据
+ * 格式：gyro_x, gyro_y, gyro_z, acc_x, acc_y, acc_z, pitch, roll, yaw (9个float)
+ */
+void vofa_send_imu_data(void)
+{
+    float vofa_data[9];  // 9个float数据
+
+    // 获取原始传感器数据
+    const imu_raw_data_t *raw = imu_get_raw_data();
+    if (raw == NULL) return;
+
+    // 前6个：角速度（rad/s）和加速度（g）
+    vofa_data[0] = raw->gyro_x;
+    vofa_data[1] = raw->gyro_y;
+    vofa_data[2] = raw->gyro_z;
+    vofa_data[3] = raw->acc_x;
+    vofa_data[4] = raw->acc_y;
+    vofa_data[5] = raw->acc_z;
+
+    // 后3个：姿态角度（度）
+    imu_attitude_t attitude;
+    if (0 == imu_get_attitude(IMU_ALGO_MAHONY, &attitude))
+    {
+        vofa_data[6] = attitude.pitch;
+        vofa_data[7] = attitude.roll;
+        vofa_data[8] = attitude.yaw;
+    }
+    else
+    {
+        vofa_data[6] = 0.0f;
+        vofa_data[7] = 0.0f;
+        vofa_data[8] = 0.0f;
+    }
+
+    // 发送数据
+    vofa_send_data(vofa_data, 9);
+}
+
+/********************************************************************************************************************
+ * 主程序
+ ********************************************************************************************************************/
+
 int main(void)
 {
-    clock_init(SYSTEM_CLOCK_120M);                                              // 初始化芯片时钟 工作频率为 120MHz
-    debug_init();                                                               // 初始化默认 Debug UART
+    // 系统初始化
+    clock_init(SYSTEM_CLOCK_120M);
+    debug_init();
+    system_delay_ms(100);
 
-    // 此处编写用户代码 例如外设初始化代码等
-    
-    // 此处编写用户代码 例如外设初始化代码等
-    // printf("MM32F327X-G8P 开源库移植用空工程\r\n");     // 打印提示信息
-    
-    imu963ra_init();                                                        // 初始化 IMU963RA
-    
+    // IMU系统初始化
+    imu_system_init(IMU_SAMPLE_RATE);
 
-    uint16_t counter = 0;
-    int16_t imu963ra_acc_x_last = 0, imu963ra_acc_y_last = 0, imu963ra_acc_z_last = 0;
-    int16_t imu963ra_gyro_x_last = 0, imu963ra_gyro_y_last = 0, imu963ra_gyro_z_last = 0;
-    printf("IMU963RA init complete.\r\n");
-    for (counter = 0; counter < 10000; counter++)
+    // ✅ 加速度计静态校准（设备必须水平静止放置！）
+    // 艹！这一步超级重要！消除加速度计偏移
+    // 你的ay=0.139就是因为没校准！
+    //imu_calibrate_acc_start();
+
+    // ✅ 陀螺仪静态校准（设备必须完全静止放置！）
+    // 艹！这一步超级重要！消除初始零漂±3-5°/s
+    imu_calibrate_gyro_start();
+
+    // 等待IMU数据稳定
+    for (uint16_t i = 0; i < 100; i++)
     {
-        imu963ra_get_acc();
-        imu963ra_get_gyro();
-        if ((imu963ra_acc_x == imu963ra_acc_x_last) &&
-            (imu963ra_acc_y == imu963ra_acc_y_last) &&
-            (imu963ra_acc_z == imu963ra_acc_z_last) &&
-            (imu963ra_gyro_x == imu963ra_gyro_x_last) &&
-            (imu963ra_gyro_y == imu963ra_gyro_y_last) &&
-            (imu963ra_gyro_z == imu963ra_gyro_z_last))
-        {
-            counter--;
-        }
-        imu963ra_acc_x_last = imu963ra_acc_x;
-        imu963ra_acc_y_last = imu963ra_acc_y;
-        imu963ra_acc_z_last = imu963ra_acc_z;
-        imu963ra_gyro_x_last = imu963ra_gyro_x;
-        imu963ra_gyro_y_last = imu963ra_gyro_y;
-        imu963ra_gyro_z_last = imu963ra_gyro_z;
-
+        imu_update();
+        system_delay_ms(5);
     }
-    printf("IMU963RA data stable complete.\r\n");
-    imu963ra_get_acc();
-    imu963ra_get_gyro();
-    printf("%d,%d,%d,%d,%d,%d\r\n", imu963ra_acc_x, imu963ra_acc_y, imu963ra_acc_z,
-                                   imu963ra_gyro_x, imu963ra_gyro_y, imu963ra_gyro_z);
 
+    // 使能Mahony算法
+    imu_algorithm_enable(IMU_ALGO_MAHONY);
+
+    // ✅ 禁用磁力计（六轴模式）
+    extern void mahony_set_mag_enable(bool enable);
+    mahony_set_mag_enable(false);
+
+    // ✅ 禁用Ki积分（避免六轴模式下的Yaw漂移）
+    extern void mahony_set_Ki(float Ki);
+    mahony_set_Ki(0.0f);
+
+    // 初始化定时器中断（500Hz）
+    uint32_t timer_period_ms = 1000 / IMU_SAMPLE_RATE;
+    pit_ms_init(TIM6_PIT, timer_period_ms);
+
+    // 计算VOFA+发送分频系数
+    uint32_t vofa_divider = IMU_SAMPLE_RATE / VOFA_SEND_RATE;
+    uint32_t vofa_send_counter = 0;
+
+    // 主循环
     while(1)
     {
-        // imu963ra_get_acc();
-        // imu963ra_get_gyro();
-        // printf("%d,%d,%d,%d,%d,%d\r\n", imu963ra_acc_x, imu963ra_acc_y, imu963ra_acc_z,
-        //                            imu963ra_gyro_x, imu963ra_gyro_y, imu963ra_gyro_z);
-        // 此处编写需要循环执行的代码
-        
-        // 此处编写需要循环执行的代码
+        // 检查IMU更新标志
+        if (g_imu_update_flag)
+        {
+            g_imu_update_flag = 0;
+
+            vofa_send_counter++;
+
+            // 按照设定的频率发送数据
+            if (vofa_send_counter >= vofa_divider)
+            {
+                vofa_send_counter = 0;
+                vofa_send_imu_data();
+            }
+        }
     }
+
+    return 0;
 }
-// **************************** 代码区域 ****************************
